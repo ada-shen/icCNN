@@ -4,8 +4,8 @@ This repository is a pytorch implementation of interpretable compositional convo
 
 Document Structure
 
---utils 
-    --utils.py [the utility modules used for networks]
+###utils 
+--utils.py [the utility modules used for networks]
 --train_all.py [the top module of networks]
 --celeb.py [the dataset driver for Large-scale CelebFaces Attributes (CelebA) dataset]
 --cub_voc.py [the dataset driver for CUB200-2011 dataset/PASCAL-Part dataset/Helen Facial Feature dataset]
@@ -23,10 +23,8 @@ Document Structure
 --SpectralClustering.py [the module of Spectral Clustering]
 --Similar_Mask_Generate.py [the module to generate similar masks]
 
-Usage
+###train/test
 
---train/test
+```
 python3 train_all.py -type [ori/iccnn] -is_multi [single/multi 0/1] -model [vgg/resnet/densenet]
-
-Other settings should be changed in the corresponding file.
-
+```
