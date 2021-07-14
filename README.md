@@ -1,5 +1,6 @@
 # icCNN
-This repository is a pytorch implementation of interpretable compositional convolutional neural networks.
+This repository is a pytorch implementation of interpretable compositional convolutional neural networks ([arXiv](https://arxiv.org/abs/2107.04474), which has been published at IJCAI 2021.
+
 
 
 Document Structure
