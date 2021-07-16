@@ -45,3 +45,16 @@ Document Structure
 ```
 python3 train_all.py -type [ori/iccnn] -is_multi [single/multi 0/1] -model [vgg/resnet/densenet]
 ```
+
+## Citation
+
+If you use this project in your research, please cite it.
+
+```
+@inproceedings{shen2021interpretable,
+ title={Interpretable Compositional Convolutional Neural Networks},
+ author={Shen, Wen and Wei, Zhihua and Huang, Shikun and Zhang, Binbin and Fan, Jiaqi and Zhao, Ping and Zhang, Quanshi},
+ booktitle={Proceedings of the International Joint Conference on Artificial Intelligence},
+ year={2021}
+}
+```
