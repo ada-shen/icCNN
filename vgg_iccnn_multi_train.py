@@ -19,21 +19,21 @@ from SpectralClustering import spectral_clustering
 from newPad2d import newPad2d
 
 IS_TRAIN = 0        # 0/1
-LAYERS = '13'
+LAYERS = '19'
 DATANAME = 'voc_multi' # voc_multi
 NUM_CLASSES = 6
-cub_file = '/data/sw/dataset/frac_dataset'
-voc_file = '/data/sw/dataset/VOCdevkit/VOC2010/voc2010_crop'
-log_path = '/data/fjq/iccnn/vgg/' # for model
-save_path = '/data/fjq/iccnn/basic_fmap/vgg/'  # for get_feature
-acc_path = '/data/fjq/iccnn/basic_fmap/vgg/acc/'
+cub_file = './dataset/frac_dataset'
+voc_file = './dataset/VOCdevkit/VOC2010/voc2010_crop'
+log_path = './icCNN/run/vgg/' # for model
+save_path = './icCNN/run/basic_fmap/vgg/'  # for get_feature
+acc_path = './icCNN/run/basic_fmap/vgg/acc/'
 
 dataset = '%s_vgg_%s_iccnn' % (LAYERS, DATANAME)
 log_path = log_path + dataset + '/'
-pretrain_model = log_path + 'model_2000.pth'
+pretrain_model = log_path + 'model_1000.pth'
 BATCHSIZE = 1
-LR = 0.000001
-EPOCH = 3000
+LR = 0.00001
+EPOCH = 1000
 center_num = 16
 lam1 = 0.1
 lam2 = 0.1
@@ -43,6 +43,8 @@ STOP_CLUSTERING = 200
 if LAYERS == '13':
     CHANNEL_NUM = 512
 elif LAYERS == '16':
+    CHANNEL_NUM = 512
+elif LAYERS == '19':
     CHANNEL_NUM = 512
 
 __all__ = ['VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn','vgg19_bn', 'vgg19',]
@@ -70,6 +72,8 @@ class VGG(nn.Module):
             self.target_layer = 42
         if cfg=='B': # VGG13
             self.target_layer = 33
+        if cfg=='E': # VGG19
+            self.target_layer = 51
         self.layer_num = self.target_layer
         self.smg = SMGBlock(channel_size = CHANNEL_NUM, f_map_size=F_MAP_SIZE)
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
@@ -90,10 +94,12 @@ class VGG(nn.Module):
             if isinstance(layer,nn.Conv2d):
                 x = self.pad2d(x)
             x = layer(x)
+
         if eval:
             return x
         corre_matrix = self.smg(x)
         f_map = x.detach()
+        fd = x
         for layer in self.features[self.target_layer+1:]:
             if isinstance(layer,nn.Conv2d):
                 x = self.pad2d(x)
@@ -101,7 +107,7 @@ class VGG(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
-        return x, f_map, corre_matrix
+        return x, f_map, corre_matrix , fd
 
     def _initialize_weights(self):
         for layer, m in enumerate(self.modules()):
@@ -151,7 +157,7 @@ def vgg16(arch, cfg, device=None, pretrained=False, progress=True, **kwargs):
             model = nn.DataParallel(model).to(device)
             pretrained_dict = torch.load(pretrain_model)
             if IS_TRAIN == 0:
-                pretrained_dict = {k[k.find('.')+1:]: v for k, v in pretrained_dict.items()}
+                pretrained_dict = {k[k.find('.')+1:]: v for k, v in pretrained_dict.items()} # imagenet need comment
             # model_dict = model.state_dict()
             # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
             # model_dict.update(pretrained_dict)
@@ -202,7 +208,8 @@ def net_train():
         net = vgg16(arch='vgg13_bn',cfg='B', device=device, pretrained=True, progress=True)
     elif LAYERS == '16':
         net = vgg16(arch='vgg16_bn',cfg='D', device=device, pretrained=True, progress=True)  
-
+    elif LAYERS == '19':
+        net = vgg16(arch='vgg19_bn',cfg='E', device=device, pretrained=True, progress=True)
     # Loss and Optimizer
     criterion_ce = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.module.parameters(), lr=LR)
@@ -224,20 +231,53 @@ def net_train():
             scheduler.step()
             net.train()
             all_feature = []
+            all_grad = []
+            clr_loss_grad = []
+            loss1_grad = []
+            loss2_grad = []
+            all_label = []
+            all_f_map = []
             total_loss = 0.0
             similarity_loss = 0.0
             class_loss = 0.0
             for batch_step, input_data in tqdm(enumerate(trainset_loader,0),total=len(trainset_loader),smoothing=0.9):
                 inputs, labels = input_data
                 inputs, labels = inputs.to(device), labels.to(device)
+                inputs.requires_grad=True
+                all_label.append(labels.detach().cpu().numpy())
 
-                output, f_map, corre = net(inputs)
+                output, f_map, corre, fd = net(inputs)
+
+                fd.retain_grad()
                 clr_loss = criterion_ce(output, labels)
                 loss1 = cs_loss.update(corre, loss_mask_num, loss_mask_den, None)
-                loss2 = mc_loss.update(f_map, loss_mask_num, labels)
-                loss =  clr_loss + lam1 *loss1 + lam2*loss2
+                loss2 = mc_loss.update(fd, loss_mask_num, labels)
+                loss =  clr_loss + lam1 * loss1 + lam2 * loss2
+                if epoch <= 0:
+                    # optimizer.zero_grad()
+                    # clr_loss.backward(retain_graph=True)
+                    # clr_loss_grad.append(fd.grad.detach().cpu().numpy())
+                    # print(fd.grad.shape)
+                    # print('-'*10)
+                    # optimizer.zero_grad()
+                    # loss1.backward(retain_graph=True)
+                    # loss1_grad.append(fd.grad.detach().cpu().numpy())
+                    # print(fd.grad.shape)
+                    # print('-'*10)
+                    optimizer.zero_grad()
+                    loss2.requires_grad_(True)
+                    loss2.backward(retain_graph=True)
+                    print(inputs.grad.shape)
+                    if fd.grad != None:
+                        loss2_grad.append(fd.grad.detach().cpu().numpy())
+                    else:
+                        loss2_grad.append(fd.grad)
+                    print('-'*10)
                 optimizer.zero_grad()
                 loss.backward()
+                if epoch <= 0:
+                    all_f_map.append(f_map.detach().cpu().numpy())
+                    all_grad.append(fd.grad.detach().cpu().numpy())
                 optimizer.step()
                 total_loss += loss.item()
                 similarity_loss += loss1.item()
@@ -249,9 +289,10 @@ def net_train():
             save_total_loss.append(total_loss)
             save_similatiry_loss.append(similarity_loss)
             save_class_loss.append(class_loss)
-            #acc = test(net, testset_loader)
-            acc = 0
+            acc = test(net, testset_loader)
             print('Epoch', epoch, 'loss: %.4f' % total_loss, 'sc_loss: %.4f' % similarity_loss, 'class_loss: %.4f' % class_loss, 'test accuracy:%.4f' % acc)
+            if epoch <= 0:
+                np.savez(log_path+'grad_%.3d.npz'% (epoch), grad=np.array(all_grad),clr_loss_grad=np.array(clr_loss_grad),loss1_grad=np.array(loss1_grad),loss2_grad=np.array(loss2_grad),label=np.array(all_label),f_map=np.array(all_f_map))
             if epoch % 100 == 0:
                 torch.save(net.state_dict(), log_path+'model_%.3d.pth' % (epoch))
                 np.savez(log_path+'loss_%.3d.npz'% (epoch), loss=np.array(save_total_loss), similarity_loss = np.array(save_similatiry_loss), class_loss = np.array(save_class_loss),gt=np.array(save_gt))
@@ -282,7 +323,7 @@ def test(net, testdata):
     for inputs, labels in testdata:
         inputs, labels = inputs.cuda(), labels.cuda()
         net.eval()
-        outputs, _,_ = net(inputs)
+        outputs, _,_,_ = net(inputs)
         _, predicted = torch.max(outputs, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum()
@@ -297,7 +338,8 @@ def get_feature():
         net = vgg16(arch='vgg13_bn',cfg='B', device=device, pretrained=True, progress=True)
     elif LAYERS == '16':
         net = vgg16(arch='vgg16_bn',cfg='D', device=device, pretrained=True, progress=True)
-
+    elif LAYERS == '19':
+        net = vgg16(arch='vgg19_bn',cfg='E', device=device, pretrained=True, progress=True)
     net = nn.DataParallel(net).to(device)
     acc = test(net, testset_test)##
     f = open(acc_path+dataset+'_test.txt', 'w+')
