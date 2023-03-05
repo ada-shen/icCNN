@@ -26,17 +26,17 @@ IS_TRAIN = 0        # 0/1
 LAYERS = '121'
 DATANAME = 'voc_multi' # voc_multi
 NUM_CLASSES = 6
-cub_file = '/data/sw/dataset/frac_dataset' 
-voc_file = '/data/sw/dataset/VOCdevkit/VOC2010/voc2010_crop'
-log_path = '/data/fjq/iccnn/densenet/' # for model
-save_path = '/data/fjq/iccnn/basic_fmap/densenet/'  # for get_feature 
-acc_path = '/data/fjq/iccnn/basic_fmap/densenet/acc/'
+cub_file = '/data/sw/dataset/frac_dataset'
+voc_file = '/data2/zxh/dataset/VOCdevkit/VOC2010/voc2010_crop'
+log_path = '/data2/zxh/icCNN/run/densenet/' # for model
+save_path = '/data2/zxh/icCNN/run/basic_fmap/densenet/'  # for get_feature
+acc_path = '/data2/zxh/icCNN/run/basic_fmap/densenet/acc/'
 dataset = '%s_densenet_%s_iccnn' % (LAYERS, DATANAME)
 log_path = log_path + dataset + '/'
-pretrain_model = log_path + 'model_2000.pth'
+pretrain_model = log_path + 'model_1000.pth'#'/data2/zxh/icCNN/run/densenet/output/121_densenet_'+DATANAME+'_ori/model_200.pth'
 BATCHSIZE = 1
 LR = 0.00001
-EPOCH = 3000
+EPOCH = 1000
 center_num = 16
 lam1 = 0.1
 lam2 = 0.1
@@ -243,7 +243,7 @@ class DenseNet(nn.Module):
         if eval:
             return out
         corre_matrix = self.smg(out)
-        f_map = out.detach()    # get_feature
+        f_map = out    # get_feature
         out = F.adaptive_avg_pool2d(out, (1, 1))
         out = torch.flatten(out, 1)
         out = self.classifier(out)
@@ -406,7 +406,6 @@ def net_train():
                 inputs, labels = inputs.to(device), labels.to(device)
                 optimizer.zero_grad()
                 output, f_map, corre = net(inputs, eval=False)
-
                 clr_loss = criterion(output, labels)
                 loss1 = cs_loss.update(corre, loss_mask_num, loss_mask_den, None)
                 loss2 = mc_loss.update(f_map, loss_mask_num, labels)
@@ -424,8 +423,8 @@ def net_train():
             save_similatiry_loss.append(similarity_loss)
             save_class_loss.append(class_loss)
             acc = 0
-            #if epoch % 5==0:
-            #   acc = test(net, testset_loader)
+            if epoch % 5==0:
+              acc = test(net, testset_loader)
             print('Epoch', epoch, 'loss: %.4f' % total_loss, 'sc_loss: %.4f' % similarity_loss, 'class_loss: %.4f' % class_loss, 'test accuracy:%.4f' % acc)
             if epoch % 100 == 0:
                 torch.save(net.state_dict(), log_path+'model_%.3d.pth' % (epoch))
@@ -436,8 +435,9 @@ def net_train():
 def offline_spectral_cluster(net, train_data):
     net.eval()
     f_map = []
+    device = torch.device("cuda")
     for inputs, labels in train_data:
-        inputs, labels = inputs.cuda(), labels.cuda()
+        inputs, labels = inputs.to(device), labels.to(device)
         cur_fmap= net(inputs,eval=True).detach().cpu().numpy()
         f_map.append(cur_fmap)
     f_map = np.concatenate(f_map,axis=0)
@@ -448,7 +448,6 @@ def offline_spectral_cluster(net, train_data):
     diag = np.diag(cov).reshape(channel,-1)
     correlation = cov/(np.sqrt(np.matmul(diag,np.transpose(diag,(1,0))))+1e-5)+1
     ground_true, loss_mask_num, loss_mask_den = spectral_clustering(correlation,n_cluster=center_num)
-
     return ground_true, loss_mask_num, loss_mask_den
 
 def get_feature():
