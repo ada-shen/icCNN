@@ -46,6 +46,10 @@ Document Structure
 python3 train_all.py -type [ori/iccnn] -is_multi [single/multi 0/1] -model [vgg/resnet/densenet]
 ```
 
+### Models corresponding to results in the paper
+
+We have uploaded the model files used in the paper to the following link https://b2y4v0n4v2.feishu.cn/drive/folder/fldcnwJeKnPEuQVydwhqNH8op5d
+
 ## Citation
 
 If you use this project in your research, please cite it.
