@@ -49,6 +49,11 @@ python3 train_all.py -type [ori/iccnn] -is_multi [single/multi 0/1] -model [vgg/
 ### Models corresponding to results in the paper
 
 We have uploaded the model files used in the paper to the following link https://b2y4v0n4v2.feishu.cn/drive/folder/fldcnwJeKnPEuQVydwhqNH8op5d
+We have uploaded the model files for multi-category classification to the following link https://pan.baidu.com/s/1RlCfjiJCdGxI8fGCpeClKQ?pwd=87ps
+
+### Datasets for train and visualization
+
+We have uploaded datasets for train icCNNs and those images for visualization to the following link https://pan.baidu.com/s/1RlCfjiJCdGxI8fGCpeClKQ?pwd=87ps
 
 ## Citation
 
